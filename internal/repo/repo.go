@@ -2,27 +2,12 @@ package repo
 
 import(
 	"context"
+
 )
 
-type DepositInput struct{
-	UUID string
-	Amount uint64
-}
-
-type WithdrawInput struct{
-	UUID string
-	Amount uint64
-}
-
-type TransferInput struct{
-	FromUUID string
-	ToUUID string
-	Amount uint64
-}
-
-type User interface{
+type User interface {
 	GetBalanceByUUID(ctx context.Context, uuid string) (uint64, error)
-	Deposit(ctx context.Context, input DepositInput) error
-	Withdraw(ctx context.Context, input WithdrawInput) error
-	Transfer(ctx context.Context, input TransferInput) error
+	Deposit(ctx context.Context, uuid string, amount uint64) error
+	Withdraw(ctx context.Context, uuid string, amount uint64) error
+	Transfer(ctx context.Context, fromUuid, toUuid string, amount uint64) error
 }
