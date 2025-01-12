@@ -2,7 +2,6 @@ package repo
 
 import(
 	"context"
-
 )
 
 type User interface {
