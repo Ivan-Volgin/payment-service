@@ -73,7 +73,21 @@ func(u *UserRepo) Withdraw(ctx context.Context, uuid string, amount uint64) erro
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	sql, args, _ := u.Builder.
+	sql, args, _ := u.Builder.Select("*").From("users").Where("uuid = ?", uuid).ToSql()
+
+	var balance uint64
+	err = tx.QueryRow(ctx, sql, args...).Scan(
+		&balance,
+	)
+	if err != nil{
+		return fmt.Errorf("UserRepo.Withdraw - tx.QueryRow: %v", err)
+	}
+
+	if balance < amount{
+		return repoerrs.ErrNotEnoughBalance
+	}
+
+	sql, args, _ = u.Builder.
 		Update("users").
 		Set("balance", squirrel.Expr("balance - ?", amount)).
 		Where("uuid = ?", uuid).
@@ -82,6 +96,57 @@ func(u *UserRepo) Withdraw(ctx context.Context, uuid string, amount uint64) erro
 	_, err = tx.Exec(ctx, sql, args...)
 	if err != nil {
 		return fmt.Errorf("UserRepo.Withdraw - tx.Exec: %v", err)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return fmt.Errorf("UserRepo.Withdraw - tx.Commit: %v", err)
+	}
+	
+	return nil
+}
+
+func (u *UserRepo) Transfer(ctx context.Context, fromUuid, toUuid string, amount uint64) error {
+	tx, err := u.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("UserRepo.Transfer - r.Pool.Begin: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	sql, args, _ := u.Builder.Select("*").From("users").Where("uuid = ?", fromUuid).ToSql()
+
+	var balance uint64
+	err = tx.QueryRow(ctx, sql, args...).Scan(
+		&balance,
+	)
+	if err != nil{
+		return fmt.Errorf("UserRepo.Withdraw - tx.QueryRow: %v", err)
+	}
+
+	if balance < amount{
+		return repoerrs.ErrNotEnoughBalance
+	}
+
+	sql, args, _ = u.Builder.
+		Update("users").
+		Set("balance", squirrel.Expr("balance - ?", amount)).
+		Where("uuid = ?", fromUuid).
+		ToSql()
+
+	_, err = tx.Exec(ctx, sql, args...)
+	if err != nil {
+		return fmt.Errorf("UserRepo.Transfer - tx.Exec: %v", err)
+	}
+
+	sql, args, _ = u.Builder.
+		Update("users").
+		Set("balance", squirrel.Expr("balance + ?", amount)).
+		Where("uuid = ?", toUuid).
+		ToSql()
+
+	_, err = tx.Exec(ctx, sql, args...)
+	if err != nil {
+		return fmt.Errorf("UserRepo.Transfer - tx.Exec: %v", err)
 	}
 
 	err = tx.Commit(ctx)
